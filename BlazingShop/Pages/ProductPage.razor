@@ -1,0 +1,271 @@
+﻿@page "/product"
+@using BlazingShop.Data
+@using BlazingShop.Services
+@using BlazorInputFile
+@using System.IO
+@inherits OwningComponentBase<ProductService>
+@*@inject AuthenticationStateProvider AuthenticationStateProvider*@
+
+<AuthorizeView>
+    <Authorized>
+        @if (products == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <div class="container border p-3">
+                <div class="row">
+                    <div class="col-5">
+                        <h3 class="text-info">Product List</h3>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-info form-control" @onclick="AddNewProduct">
+                            Add new product
+                        </button>
+                    </div>
+                </div>
+                <div class="row pt-4">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Price</th>
+                                <th>Shade Color</th>
+                                <th>Category</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var obj in products)
+                            {
+
+                                <tr>
+                                    <td>@obj.Name</td>
+                                    <td>@obj.Price</td>
+                                    <td>@obj.ShadeColor</td>
+                                    <td>@obj.Category.Name</td>
+                                    <td>
+                                        <button class="btn btn-primary" style="width:150px" @onclick="(() => EditProduct(obj))">
+                                            Edit
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        You are not able to see this.
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@if (ShowPopup)
+{
+    <div class="modal" tabindex="-1" style="display:block" role="dialog">
+        <EditForm Model="@objProduct" OnValidSubmit="@ValidSubmit">
+
+
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="text-info">@(objProduct.Id == 0 ? "Create" : "Update") Product</h3>
+                        <button type="button" class="close" @onclick="ClosePopup">
+                            <span aria-hidden="true">X</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <DataAnnotationsValidator></DataAnnotationsValidator>
+                        <ValidationSummary></ValidationSummary>
+
+                        <div class="row">
+                            <div class="col-9">
+                                <div class="row py-2">
+                                    <div class="col-4">
+                                        Category Name
+                                    </div>
+                                    <div class="col-8">
+                                        <select @onchange="CategorySelectionChanged" class="form-control">
+                                            @foreach (var cat in categories)
+                                            {
+                                                <option value="@cat.Id"
+                                                        selected="@(cat.Id == objProduct.CategoryId)">
+                                                    @cat.Name
+                                                </option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4">
+                                        Product Name
+
+                                    </div>
+                                    <div class="col-8">
+                                        <InputText class="form-control" @bind-Value="objProduct.Name"></InputText>
+                                        <ValidationMessage For="@(() => objProduct.Name)"></ValidationMessage>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4">
+                                        Price
+
+                                    </div>
+                                    <div class="col-8">
+                                        <input class="form-control" type="text" @bind="objProduct.Price" />
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4">
+                                        Shade Color
+
+                                    </div>
+                                    <div class="col-8">
+                                        <input class="form-control" type="text" @bind="objProduct.ShadeColor" />
+                                        <ValidationMessage For="@(() => objProduct.ShadeColor)"></ValidationMessage>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4">
+                                        Image
+
+                                    </div>
+                                    <div class="col-8">
+                                        <InputFile OnChange="HandleSelection"></InputFile>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="offset-4 col">
+                                        <button class="btn btn-success form-control" type="submit">Submit</button>
+                                    </div>
+                                    @if (objProduct.Id > 0)
+                                    {
+                                        <div class="col">
+                                            <button class="btn btn-danger form-control"
+                                                    @onclick="DeleteProduct"
+                                                    type="submit">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <img src="@convertImageToDisplay(objProduct.Image)" width="100%" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    List<Category> categories;
+    List<Product> products;
+    bool ShowPopup = false;
+    Product objProduct = new Product();
+    public byte[] ImageUploaded { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        //var user = (await authenticationState).User;
+        products = Service.GetProducts();
+    }
+
+    void AddNewProduct()
+    {
+        objProduct = new Product();
+        categories = Service.GetCategoryList();
+        objProduct.CategoryId = categories.ToList()[0].Id;
+        objProduct.Id = 0;
+
+        ShowPopup = true;
+    }
+
+    void EditProduct(Product product)
+    {
+        objProduct = product;
+        categories = Service.GetCategoryList();
+        ShowPopup = true;
+    }
+
+    void DeleteProduct()
+    {
+        ShowPopup = false;
+        var result = Service.DeleteProduct(objProduct);
+        products.Clear();
+        products = Service.GetProducts();
+    }
+
+    void ClosePopup()
+    {
+        ShowPopup = false;
+    }
+
+    void ValidSubmit()
+    {
+        var result = false;
+        ShowPopup = false;
+
+        if (ImageUploaded != null)
+        {
+            objProduct.Image = ImageUploaded;
+            ImageUploaded = null;
+        }
+
+        if (objProduct.Id > 0)
+        {
+            result = Service.UpdateProduct(objProduct);
+        }
+        else
+        {
+            result = Service.CreateProduct(objProduct);
+        }
+
+        products = Service.GetProducts();
+    }
+
+    async Task HandleSelection(IFileListEntry[] files)
+    {
+        var file = files.FirstOrDefault();
+        if (file != null)
+        {
+            var ms = new MemoryStream();
+            await file.Data.CopyToAsync(ms);
+
+            ImageUploaded = ms.ToArray();
+        }
+    }
+
+    string convertImageToDisplay(byte[] image)
+    {
+        if (image != null)
+        {
+            var base64 = Convert.ToBase64String(image);
+            var finalStr = string.Format("data:image/jpg;base64,{0}", base64);
+
+            return finalStr;
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+    void CategorySelectionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value.ToString(), out int id))
+        {
+            objProduct.CategoryId = id;
+        }
+    }
+}

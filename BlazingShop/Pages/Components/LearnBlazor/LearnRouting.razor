@@ -1,0 +1,17 @@
+﻿@page "/learnrouting/{param1}/{param2}"
+@page "/learnrouting"
+
+@inject NavigationManager NavigationManager
+
+<h3>Component</h3>
+
+<h1>@Param1</h1>
+<h1>@Param2</h1>
+
+@code {
+    [Parameter]
+    public string Param1 { get; set; }
+
+    [Parameter]
+    public string Param2 { get; set; }
+}
